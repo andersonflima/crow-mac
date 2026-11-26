@@ -1,3 +1,4 @@
+tap "andersonflima/tap", trusted: true
 tap "clerk/stable"
 tap "dopplerhq/doppler", "https://github.com/DopplerHQ/homebrew-doppler.git", trusted: true
 tap "localstack/tap"
@@ -82,6 +83,7 @@ brew "localstack/tap/localstack-cli", trusted: true
 brew "nats-io/nats-tools/nats", trusted: true
 brew "stripe/stripe-cli/stripe", trusted: true
 brew "yugabyte/tap/yugabytedb", trusted: true
+cask "andersonflima/tap/crow-cockpit", trusted: true
 cask "1password-cli"
 cask "android-commandlinetools"
 cask "android-platform-tools"
