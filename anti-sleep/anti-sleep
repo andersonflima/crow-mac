@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# anti-sleep — impede o Mac de entrar em idle sleep ENQUANTO houver um emulador
+# de terminal aberto. Terminal fechado, a maquina volta ao comportamento normal.
+#
+# COMO FUNCIONA
+#   A cada ciclo (default 10s) o daemon procura processos cujo NOME casa com a
+#   lista de terminais. Achou pelo menos um: garante que exista UM unico
+#   `caffeinate -di` vivo. Nao achou nenhum: derruba o caffeinate.
+#
+#   `caffeinate -di` impede repouso por inatividade enquanto ha terminal.
+#   Durante atividade detectada de Codex ou Claude, tambem usa `caffeinate -s`
+#   para solicitar que o sistema nao durma; essa assercao vale apenas na tomada.
+#   Codex e detectado pela assercao de turno ativo; Claude por seus processos
+#   caffeinate temporizados, que podem durar alguns minutos apos o turno.
+#   Outros agentes nao sao detectados. Fechamento da tampa requer teste real.
+#   Nao usa pmset para alterar configuracao nem sudo.
+#
+# COMANDOS
+#   anti-sleep daemon     laco principal (e o que o LaunchAgent executa)
+#   anti-sleep check      avaliacao unica: lista terminais vistos e sai
+#   anti-sleep status     estado atual + a assercao real no pmset
+#   anti-sleep terminals  imprime a lista efetiva de terminais monitorados
+#   anti-sleep --help
+#
+# COMO ADICIONAR UM TERMINAL NOVO
+#   Edite ~/.config/anti-sleep/terminals.conf e ponha UM NOME DE PROCESSO por
+#   linha (linhas com # sao comentario). O nome e o do executavel, nao o do
+#   .app: use `pgrep -x -i <nome>` para conferir que casa, ou descubra com
+#   `ps -p <pid> -o comm=`. A comparacao e case-insensitive e o daemon rele o
+#   arquivo a cada ciclo — nao precisa reiniciar nada.
+#
+#   Exemplos: ghostty, Terminal, iTerm2, alacritty, wezterm-gui, kitty, Warp,
+#             Hyper, tabby, rio.
+#
+# LIGAR / DESLIGAR NA HORA
+#   desligar: launchctl bootout gui/$(id -u)/com.andespindola.anti-sleep
+#   ligar:    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.andespindola.anti-sleep.plist
+#
+# VARIAVEIS
+#   ANTI_SLEEP_CONF       default ~/.config/anti-sleep/terminals.conf
+#   ANTI_SLEEP_INTERVAL   segundos entre ciclos (default 10)
+
+set -uo pipefail
+
+CONF="${ANTI_SLEEP_CONF:-$HOME/.config/anti-sleep/terminals.conf}"
+INTERVAL="${ANTI_SLEEP_INTERVAL:-10}"
+CAFFEINATE_BIN="${CAFFEINATE_BIN:-/usr/bin/caffeinate}"
+
+# Lista embutida, usada quando o arquivo de config nao existe.
+DEFAULT_TERMINALS='ghostty
+Terminal
+iTerm2
+alacritty
+wezterm-gui
+kitty
+Warp
+Hyper'
+
+usage() { sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# Nomes de terminal efetivos, um por linha, sem comentarios nem linhas vazias.
+terminals() {
+  local src
+  if [ -r "$CONF" ]; then src=$(cat "$CONF"); else src="$DEFAULT_TERMINALS"; fi
+  printf '%s\n' "$src" | sed 's/#.*//' | tr -d '\r' \
+    | awk '{$1=$1; print}' | grep -v '^$'
+}
+
+# Imprime os PIDs de terminais rodando. Usa `pgrep -x` (casa o NOME do
+# executavel), nunca `pgrep -f`: com -f qualquer processo que herde variaveis
+# como GHOSTTY_RESOURCES_DIR no ambiente daria falso positivo, e praticamente
+# todo processo filho de um terminal herda.
+running_terminals() {
+  local name
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    pgrep -x -i -- "$name" 2>/dev/null | while IFS= read -r p; do
+      printf '%s\t%s\n' "$p" "$name"
+    done
+  done < <(terminals)
+}
+
+any_terminal() { [ -n "$(running_terminals | head -1)" ]; }
+
+# A separate system-sleep assertion is held only while an agent turn is detected.
+# Codex exposes an active-turn power assertion; Claude uses timed caffeinate
+# children. The latter can remain active briefly after a turn ends.
+SYSTEM_CAFF_PID=""
+agent_active() {
+  if /usr/bin/pmset -g assertions | /usr/bin/grep -q 'Codex is running an active turn'; then
+    return 0
+  fi
+  local parent
+  while read -r parent; do
+    /bin/ps -p "$parent" -o comm= 2>/dev/null | /usr/bin/grep -Eq '(^|/)claude$' && return 0
+  done < <(/bin/ps -axo ppid=,comm=,args= | /usr/bin/awk '$2 ~ /(^|\/)caffeinate$/ && /-t 300/ { print $1 }')
+  return 1
+}
+system_caff_stop() {
+  if [ -n "$SYSTEM_CAFF_PID" ]; then
+    kill "$SYSTEM_CAFF_PID" 2>/dev/null || true
+    wait "$SYSTEM_CAFF_PID" 2>/dev/null || true
+    SYSTEM_CAFF_PID=""
+  fi
+}
+system_caff_update() {
+  if agent_active; then
+    if [ -z "$SYSTEM_CAFF_PID" ] || ! kill -0 "$SYSTEM_CAFF_PID" 2>/dev/null; then
+      "$CAFFEINATE_BIN" -s -w "$$" </dev/null >/dev/null 2>&1 &
+      SYSTEM_CAFF_PID=$!
+      printf '%s anti-sleep: agent system assertion ON (pid %s; AC only)\n' "$(date '+%F %T')" "$SYSTEM_CAFF_PID"
+    fi
+  else
+    system_caff_stop
+  fi
+}
+
+CAFF_PID=""
+
+caff_alive() { [ -n "$CAFF_PID" ] && kill -0 "$CAFF_PID" 2>/dev/null; }
+
+# Idempotente: se ja existe um caffeinate vivo, nao cria outro.
+caff_start() {
+  caff_alive && return 0
+  # `-w $$` amarra o caffeinate a ESTE processo: se o daemon morrer, inclusive
+  # por kill -9, o caffeinate morre junto e nao sobra assercao orfa.
+  "$CAFFEINATE_BIN" -di -w "$$" </dev/null >/dev/null 2>&1 &
+  CAFF_PID=$!
+  printf '%s anti-sleep: assercao LIGADA (caffeinate pid %s)\n' "$(date '+%F %T')" "$CAFF_PID"
+}
+
+caff_stop() {
+  caff_alive || { CAFF_PID=""; return 0; }
+  kill "$CAFF_PID" 2>/dev/null
+  printf '%s anti-sleep: assercao DESLIGADA (caffeinate pid %s)\n' "$(date '+%F %T')" "$CAFF_PID"
+  CAFF_PID=""
+}
+
+cmd_daemon() {
+  trap 'system_caff_stop; caff_stop; exit 0' TERM INT
+  printf '%s anti-sleep: daemon iniciado (pid %s, intervalo %ss, conf %s)\n' \
+    "$(date '+%F %T')" "$$" "$INTERVAL" "$CONF"
+  while :; do
+    if any_terminal; then caff_start; else caff_stop; fi
+    system_caff_update
+    sleep "$INTERVAL"
+  done
+}
+
+cmd_check() {
+  local out
+  out=$(running_terminals)
+  if [ -n "$out" ]; then
+    echo "terminais abertos:"
+    printf '%s\n' "$out" | awk -F'\t' '{printf "  %s (pid %s)\n", $2, $1}'
+    echo "=> o Mac NAO deve entrar em idle sleep"
+  else
+    echo "nenhum terminal aberto"
+    echo "=> o Mac dorme normalmente"
+  fi
+}
+
+cmd_status() {
+  local label="com.andespindola.anti-sleep" pids
+  echo "LaunchAgent:"
+  if launchctl list 2>/dev/null | grep -q "$label"; then
+    launchctl list | grep "$label" | sed 's/^/  /'
+  else
+    echo "  NAO carregado"
+  fi
+  echo
+  cmd_check
+  echo
+  echo "caffeinate do anti-sleep:"
+  pids=$(pgrep -x caffeinate 2>/dev/null)
+  if [ -n "$pids" ]; then
+    ps -o pid,ppid,command -p $(printf '%s' "$pids" | tr '\n' ',' | sed 's/,$//') | sed 's/^/  /'
+  else
+    echo "  nenhum caffeinate rodando"
+  fi
+  echo
+  echo "assercao no pmset (dono = nosso caffeinate?):"
+  pmset -g assertions | grep 'caffeinate' | sed 's/^ */  /' || echo "  nenhuma"
+}
+
+case "${1:-}" in
+  daemon)    cmd_daemon ;;
+  check)     cmd_check ;;
+  status)    cmd_status ;;
+  terminals) terminals ;;
+  -h|--help|help|"") usage ;;
+  *) printf 'anti-sleep: comando desconhecido: %s (use --help)\n' "$1" >&2; exit 1 ;;
+esac

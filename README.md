@@ -57,3 +57,19 @@ Crie o link apenas quando o caminho de destino estiver livre. No Neovim, abra `:
 ## Conferência final
 
 Abra o Ghostty e execute `fish --version`, `tmux -V`, `nvim --version` e `node --version`. Confira a lista de plugins com `fish -c 'fisher list'`. Permissões de Acessibilidade do Karabiner e o primeiro início do Docker Desktop são etapas interativas do macOS.
+
+## Manter o Mac acordado durante o trabalho
+
+Em um Mac recém-configurado, execute este bloco no zsh. Ele instala um LaunchAgent do usuário e usa o `caffeinate` que acompanha o macOS. Enquanto um terminal monitorado estiver aberto, a tela e o sistema ficam acordados por inatividade, inclusive na bateria. Na tomada, o serviço também solicita que o sistema permaneça acordado durante atividade detectada do Codex ou Claude.
+
+```sh
+cd "$HOME/.ghq/github.com/andersonflima/crow-mac/anti-sleep"
+mkdir -p "$HOME/.local/bin" "$HOME/.config/anti-sleep" "$HOME/Library/LaunchAgents"
+cp -n anti-sleep "$HOME/.local/bin/"
+cp -n terminals.conf "$HOME/.config/anti-sleep/"
+cp -n com.andespindola.anti-sleep.plist "$HOME/Library/LaunchAgents/"
+launchctl print "gui/$(id -u)/com.andespindola.anti-sleep" >/dev/null 2>&1 || launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.andespindola.anti-sleep.plist"
+"$HOME/.local/bin/anti-sleep" status
+```
+
+Edite `~/.config/anti-sleep/terminals.conf` para escolher os terminais monitorados. Para parar o serviço na sessão atual, use `launchctl bootout "gui/$(id -u)/com.andespindola.anti-sleep"`. A lista é relida a cada dez segundos. Uma instalação anterior é preservada.
