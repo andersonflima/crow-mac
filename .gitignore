@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+coverage/
+.DS_Store
+*.log
+.idea/
+.vscode/
+.claude/
+.crow/
+.agent/
+tmp/
