@@ -20,6 +20,16 @@ brew bundle check --file=Brewfile
 
 As entradas brew e cask cobrem ferramentas e aplicativos. As entradas vscode, npm, go e cargo cobrem extensões e utilitários instalados pelos respectivos gerenciadores. Entre os componentes estão Fish, Starship, tmux, Neovim, Node, Go, Rust, Ghostty, Docker Desktop e Karabiner. Serviços externos podem solicitar login quando você decidir usá-los. Reexecutar o bundle permite retomar uma instalação interrompida. O manifesto acompanha as versões disponíveis nos repositórios dos pacotes.
 
+### Perfil portátil do Git
+
+Na pasta do clone, instale o perfil somente se ainda não houver um arquivo ou link em `~/.gitconfig`:
+
+```sh
+test -e "$HOME/.gitconfig" || test -L "$HOME/.gitconfig" || cp .gitconfig "$HOME/.gitconfig"
+```
+
+O perfil inclui cores, Neovim como editor e aliases como `git st` e `git hist`. Os atalhos de Git Flow exigem o subcomando `git flow`. Configure sua identidade e autenticação separadamente; elas não fazem parte deste arquivo.
+
 ## 3. Configurar o Fish
 
 Na pasta do clone, instale o Fisher e aplique o manifesto no perfil novo:
