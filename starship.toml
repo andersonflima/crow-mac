@@ -1,0 +1,40 @@
+palette = "crowquill_ink"
+format = "[┌───────────────────](bold teal)\n[│](bold teal)$all\n[└─](bold teal) "
+scan_timeout = 100
+command_timeout = 1000
+add_newline = false
+
+[character]
+success_symbol = "[➜ ](bold teal)"
+error_symbol = "[ ✗ ](bold red)"
+
+[battery]
+disabled = true
+
+[palettes.crowquill_ink]
+rosewater = "#e4e4e4"
+flamingo = "#e4e4e4"
+pink = "#d2d2d2"
+mauve = "#c6c6c6"
+red = "#ffffff"
+maroon = "#c6c6c6"
+peach = "#c6c6c6"
+yellow = "#d2d2d2"
+green = "#a8a8a8"
+teal = "#ffffff"
+sky = "#c6c6c6"
+sapphire = "#c6c6c6"
+blue = "#c6c6c6"
+lavender = "#b4b4b4"
+text = "#a8a8a8"
+subtext1 = "#a8a8a8"
+subtext0 = "#8c8c8c"
+overlay2 = "#8c8c8c"
+overlay1 = "#6a6a6a"
+overlay0 = "#6a6a6a"
+surface2 = "#4a4a4a"
+surface1 = "#4a4a4a"
+surface0 = "#2a2a2a"
+base = "#0a0a0a"
+mantle = "#0a0a0a"
+crust = "#000000"

@@ -52,7 +52,19 @@ grep -Fxq "$fish_path" /etc/shells || echo "$fish_path" | sudo tee -a /etc/shell
 chsh -s "$fish_path"
 ```
 
-## 4. Neovim e tmux
+## 4. tmux, Starship e Neovim
+
+Na pasta do clone, instale os perfis sem substituir arquivos ou links existentes:
+
+```sh
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
+prompt_file="${STARSHIP_CONFIG:-$cfg/starship.toml}"
+mkdir -p "$cfg/tmux" "$(dirname "$prompt_file")"
+test -e "$HOME/.tmux.conf" || test -L "$HOME/.tmux.conf" || test -e "$cfg/tmux/tmux.conf" || test -L "$cfg/tmux/tmux.conf" || cp tmux.conf "$cfg/tmux/tmux.conf"
+test -e "$prompt_file" || test -L "$prompt_file" || cp starship.toml "$prompt_file"
+```
+
+O tmux usa `Ctrl-t` como prefixo e `h/j/k/l` para navegar entre painéis. O perfil Fish deste repositório ativa o Starship com a paleta Crowquill Ink.
 
 Para usar a configuração pública do editor em uma máquina nova:
 
