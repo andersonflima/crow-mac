@@ -26,12 +26,13 @@ Na pasta do clone, instale o Fisher e aplique o manifesto no perfil novo:
 
 ```sh
 mkdir -p "$HOME/.config/fish"
+test -e "$HOME/.config/fish/config.fish" || test -L "$HOME/.config/fish/config.fish" || cp config.fish "$HOME/.config/fish/config.fish"
 fish -c 'curl -fsSL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source; and fisher install jorgebucaran/fisher'
 cp fish_plugins "$HOME/.config/fish/fish_plugins"
 fish -c 'fisher update; and fisher list'
 ```
 
-A lista inclui Fisher, z para navegar entre diretórios, Shellder, Tide v5 e Catppuccin. O comando de cópia substitui a lista de plugins do perfil. O Starship também está disponível no Brewfile. Para adotá-lo como prompt, inclua `starship init fish | source` ao fim do seu config.fish.
+A lista inclui Fisher, z para navegar entre diretórios, Shellder, Tide v5 e Catppuccin. O comando de cópia substitui a lista de plugins do perfil. O perfil portátil `config.fish` ativa Starship quando instalado. O comando acima preserva um config.fish existente, inclusive se for um link simbólico.
 
 Para usar Fish como shell de login em Apple Silicon, rode os comandos abaixo no zsh e abra uma nova sessão:
 
